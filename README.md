@@ -3,6 +3,8 @@
 Requirements:
 numpy, matplotlib, scipy
 
+U DONT NEED TO COMPILE ANYTHING, JUST LAUNCH JUPYTER, LOAD KERNEL AND WORK!
+
 This directory contains two .py files and one .ipynb notebook:
 
 ransac_pf.py has the main instruments needed to things work: loader, normalization and pair construction classes and functions
