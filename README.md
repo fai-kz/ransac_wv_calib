@@ -1,5 +1,7 @@
 # ransac_peakfinder
 
+Requirements:
+numpy, matplotlib, scipy
 
 This directory contains two .py files and one .ipynb notebook:
 
