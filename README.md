@@ -12,7 +12,7 @@ dtw.py has similiar stuff but applied for dtw, but if you dont need dtw - dont i
 
 ransac_pf_usage.ipynb - name speaks for itself. notebook contains usage test case (with dtw too) and has explanatory comments. 
 
-edit: я также загрузил 2 .txt файла, которые я преимущественно использовал при написании 
+edit: I also uploaded the two .txt files that I primarily used while writing the code
 
 ### !!!! ####
 if you having a hard time reading the code or understanding the underlying algorithm, please:

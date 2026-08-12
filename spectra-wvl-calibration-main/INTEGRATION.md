@@ -1,62 +1,62 @@
-# Интеграция в PHP-сервис
+# PHP Service Integration
 
-## Вариант 1: отдельная страница инструмента
+## Option 1: A Standalone Tool Page
 
-1. На машине сборки установите Node.js 20+.
-2. Выполните `corepack enable`, `pnpm install --frozen-lockfile` и `pnpm run build`.
-3. Скопируйте всё содержимое `dist/`, включая папку `assets/`, например в `/var/www/virtual-observatory/tools/wavelength-calibration/`.
-4. Настройте маршрут PHP/nginx/Apache так, чтобы он отдавал `index.html` из этой папки.
+1. Install Node.js 20+ on the build machine.
+2. Run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build`.
+3. Copy the entire contents of `dist/`, including the `assets/` directory, to a location such as `/var/www/virtual-observatory/tools/wavelength-calibration/`.
+4. Configure the PHP application, nginx, or Apache route to serve `index.html` from that directory.
 
-Серверу не нужны Python, NumPy или SciPy: вычислительный код включён в JavaScript-сборку.
+The server does not require Python, NumPy, or SciPy because the calculation code is included in the JavaScript build.
 
-## Где выполняется расчёт
+## Where the Calculation Runs
 
-После открытия страницы браузер получает с сервера HTML, CSS, основной JavaScript и отдельный вычислительный JavaScript-модуль. При выборе файла браузер читает его через стандартный File API. В текущем коде нет `fetch`, формы загрузки или API-вызова, который отправлял бы спектр на PHP-сервер.
+When the page opens, the browser downloads the HTML, CSS, main JavaScript bundle, and a separate calculation module from the server. When a user selects a file, the browser reads it through the standard File API. The current project contains no `fetch` request, upload form, or API call that sends the spectrum to the PHP server.
 
-Расчёт запускается в Web Worker — это отдельный фоновый поток JavaScript внутри вкладки браузера. Он нужен, чтобы DTW и RANSAC не блокировали кнопки и прокрутку страницы. Это не серверный Worker и не отдельный сервис.
+The calculation runs in a Web Worker, which is a background JavaScript thread inside the browser tab. It prevents DTW and RANSAC from blocking the page controls and scrolling. It is not a server-side worker or a separate service.
 
-Следствия для эксплуатации:
+Operational consequences:
 
-- PHP/nginx/Apache только раздают статические файлы, поэтому число одновременных расчётов почти не увеличивает вычислительную нагрузку сервера;
-- скорость зависит от компьютера пользователя;
-- пример на 1024 отсчёта обрабатывается быстро; спектры с десятками тысяч точек, большим DTW-окном и 20 000 итераций будут заметно тяжелее;
-- действуют защитные ограничения: файл до 25 МБ, до 100 000 точек и не более 350 пиков, передаваемых в DTW;
-- если организации необходимо хранить исходные спектры, вести очередь или выполнять расчёт централизованно, потребуется отдельный серверный API — текущая версия этого намеренно не делает.
+- PHP, nginx, or Apache only serves static files, so concurrent calculations add almost no computational load to the server.
+- Calculation speed depends on the user's computer.
+- The included 1,024-sample example is processed quickly. Spectra with tens of thousands of samples, a large DTW window, and 20,000 iterations will require substantially more processing time.
+- Protective limits are enforced: files up to 25 MB, up to 100,000 data points, and no more than 350 peaks passed to DTW.
+- If the organization needs to store input spectra, manage a processing queue, or run calculations centrally, a separate server API will be required. The current version intentionally does not provide one.
 
-## Вариант 2: внутри существующего PHP-шаблона
+## Option 2: Integration into an Existing PHP Template
 
-После сборки откройте `dist/index.html`. В PHP-шаблон перенесите:
+After building the project, open `dist/index.html` and copy the following container into the PHP template:
 
 ```html
 <div id="root"></div>
 ```
 
-и сгенерированные теги `<script type="module" ...>` / `<link rel="stylesheet" ...>`. Пути должны указывать на скопированные файлы из `dist/assets/`. Имена содержат hash и меняются после новой сборки, поэтому лучше автоматизировать копирование всего `dist/index.html` или читать manifest Vite в процессе деплоя.
+Also include the generated `<script type="module" ...>` and `<link rel="stylesheet" ...>` tags. Their paths must point to the copied files in `dist/assets/`. The asset filenames contain hashes and change after each new build, so deployment should preferably copy the complete generated `dist/index.html` or read a Vite manifest automatically.
 
-## Требования HTTP-сервера
+## HTTP Server Requirements
 
-- отдавать `.js` с MIME `text/javascript`;
-- не блокировать загрузку module worker политикой Content-Security-Policy;
-- если используется CSP, разрешить `worker-src 'self'` и `script-src 'self'`;
-- сохранять все файлы из `dist/assets/` рядом друг с другом;
-- разрешить скачивание Blob URL (`default-src` или `connect-src` не требуется; при строгой CSP может понадобиться `default-src 'self' blob:`).
+- Serve `.js` files with the `text/javascript` MIME type.
+- Do not block the module worker with Content Security Policy rules.
+- If CSP is enabled, allow `worker-src 'self'` and `script-src 'self'`.
+- Keep all generated files from `dist/assets/` together.
+- Allow Blob URL downloads. A strict CSP may require `default-src 'self' blob:`.
 
-## Обновление встроенного опорного спектра
+## Updating the Built-In Reference Spectrum
 
-Замените `src/data/reference_spectrum.txt` файлом того же текстового формата и пересоберите проект. Этот файл встраивается в worker при `pnpm run build`; доступ к файловой системе сервера во время расчёта не нужен.
+Replace `src/data/reference_spectrum.txt` with a file in the same text format and rebuild the project. The file is bundled into the calculation module by `pnpm run build`; the application does not need runtime access to the server filesystem.
 
-## Форматы и научные ограничения
+## Data Formats and Scientific Limitations
 
-- Для текстового собственного reference первая колонка должна быть физической длиной волны, предпочтительно в Å.
-- Для FITS reference используются `CRVAL1`, `CDELT1` (или `CD1_1`) и `CRPIX1`; reference FITS без WCS отклоняется, чтобы не выдавать пиксельную шкалу за длину волны.
-- Поддерживается только одномерный массив в primary HDU. FITS binary table, данные в extensions и многомерные изображения требуют отдельного адаптера.
-- Текущая реализация повторяет вычислительную схему ноутбука, но делает RANSAC детерминированным и исключает повторное назначение одного reference-пика нескольким target-пикам.
+- For a custom text reference spectrum, the first column must contain physical wavelength values, preferably in angstroms.
+- A reference FITS file uses `CRVAL1`, `CDELT1` or `CD1_1`, and `CRPIX1`. A reference FITS file without WCS is rejected to prevent a pixel axis from being presented as a wavelength axis.
+- Only one-dimensional arrays in the primary HDU are supported. FITS binary tables, data stored in extensions, and multidimensional images require a separate adapter.
+- The implementation follows the calculation workflow of the notebook while making RANSAC deterministic and preventing one reference peak from being assigned to multiple target peaks.
 
-## Быстрая приёмочная проверка
+## Acceptance Checklist
 
-1. Откройте страницу: интерфейс должен появиться на английском. Нажмите `Load example`.
-2. Запустите калибровку с параметрами по умолчанию.
-3. Убедитесь, что появились DTW-график, калиброванный спектр, полиномиальная зависимость и остатки.
-4. Скачайте JSON и CSV; в JSON должны быть `summary`, `solution`, `matches`, а CSV должен содержать четыре колонки.
-5. Переключитесь на `My reference spectrum` и проверьте, что запуск заблокирован до загрузки reference-файла.
-6. Переключите язык на RU и проверьте перевод заголовков, параметров, статусов и графиков.
+1. Open the page and confirm that the interface appears in English. Click **Load example**.
+2. Run the calibration with the default parameters.
+3. Confirm that the DTW plot, calibrated spectrum, polynomial solution, and residual plot appear.
+4. Download the JSON and CSV files. The JSON must contain `summary`, `solution`, and `matches`; the CSV must contain four columns.
+5. Select **My reference spectrum** and confirm that calibration remains disabled until a reference file is provided.
+6. Switch the interface to RU and verify that the headings, parameters, progress messages, and plots are translated.
