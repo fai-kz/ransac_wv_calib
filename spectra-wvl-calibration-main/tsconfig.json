@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/main.tsx",
+    "src/vite-env.d.ts",
+    "src/app/App.tsx",
+    "src/app/components/Header.tsx",
+    "src/app/components/InputSection.tsx",
+    "src/app/components/MethodsPanel.tsx",
+    "src/app/components/ProcessingPipeline.tsx",
+    "src/app/components/ResultsSection.tsx",
+    "src/app/components/DTWQualityPlot.tsx",
+    "src/lib/**/*.ts",
+    "src/workers/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
