@@ -82,8 +82,8 @@ export default function App() {
 
   const loadExample = () => {
     setTargetFile(new File([exampleTargetRaw], "example_target_spectrum.txt", { type: "text/plain" }));
-    setReferenceFile(null);
-    setUseInternalReference(true);
+    // Loading a different target must not discard the selected reference.
+    if (!referenceFile) setUseInternalReference(true);
     setParameters(DEFAULT_PARAMETERS);
     setResult(null);
     setError(null);
@@ -119,8 +119,8 @@ export default function App() {
               isProcessing={isProcessing}
               error={error}
               language={language}
-              onTargetUpload={(file) => { setTargetFile(file); invalidateResult("targetChanged"); }}
-              onReferenceUpload={(file) => { setReferenceFile(file); invalidateResult("referenceChanged"); }}
+              onTargetUpload={(file) => { setTargetFile(file); if (referenceFile) setUseInternalReference(false); invalidateResult("targetChanged"); }}
+              onReferenceUpload={(file) => { setReferenceFile(file); setUseInternalReference(false); invalidateResult("referenceChanged"); }}
               onReferenceModeChange={(value) => { setUseInternalReference(value); invalidateResult("referenceSourceChanged"); }}
               onRunCalibration={runCalibration}
               onLoadExample={loadExample}

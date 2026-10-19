@@ -1,3 +1,5 @@
+import { makeSpectrumAgreement } from "./spectrumAgreement";
+import { matchPeaks, type PeakMatch } from "./peakMatching";
 import type { Language, StageKey } from "../i18n";
 
 export interface CalibrationParameters {
@@ -211,29 +213,51 @@ export function runCalibration(
   }
 
   onProgress(35, "matchingDtw");
-  const initialMatches = matchPeaks(
-    targetPeaks,
-    referencePeaks,
-    targetXNorm,
-    referenceXNorm,
-    targetYNorm,
-    referenceYNorm,
-    parameters.dtwWindow,
-  );
-
-  if (initialMatches.length < minimumMatches) {
-    throw new Error(messages.dtwMatches(initialMatches.length));
-  }
-
+  const agreement = makeSpectrumAgreement(targetXNorm, targetYNorm, reference.x, referenceYNorm);
+  type Candidate = { matches: PeakMatch[]; fit: ReturnType<typeof fitRansac>; score: number };
+  const candidates: Candidate[] = [];
+  const evaluate = (matches: PeakMatch[]): Candidate | null => {
+    if (matches.length < minimumMatches) return null;
+    try {
+      const fit = fitRansac(matches, targetXNorm, reference.x, parameters, () => undefined, language);
+      const refLow = reference.x[0], refSpan = reference.x[reference.x.length - 1] - refLow;
+      const low = (evaluatePolynomial(fit.coefficients, 0) - refLow) / refSpan;
+      const high = (evaluatePolynomial(fit.coefficients, 1) - refLow) / refSpan;
+      if (low < -0.2 || low > 0.2 || high < 0.8 || high > 1.2) return null;
+      return {matches, fit, score: agreement(fit.coefficients)};
+    } catch { return null; }
+  };
   onProgress(58, "ransacSearch");
-  const ransac = fitRansac(
-    initialMatches,
-    targetXNorm,
-    reference.x,
-    parameters,
-    (fraction) => onProgress(58 + Math.round(fraction * 25), "ransacRejecting"),
-    language,
-  );
+  // Keep position-led and shape-led hypotheses. Different line widths and a
+  // nonlinear dispersion can make either initial assignment unreliable.
+  for (const strategy of ["position", "shape", "local"] as const) {
+    const matches = matchPeaks(targetPeaks, referencePeaks, targetXNorm, referenceXNorm,
+      targetYNorm, referenceYNorm, parameters.dtwWindow, {strategy});
+    let candidate = evaluate(matches);
+    if (!candidate) continue;
+    if (strategy !== "local") candidates.push(candidate);
+    const span = reference.x[reference.x.length - 1] - reference.x[0];
+    const radius = Math.max(3 / Math.min(target.x.length, reference.x.length),
+      Math.min(0.02, 1.5 * parameters.ransacTolerance / span));
+    // Revisit correspondences around the nonlinear solution, rather than
+    // committing permanently to the initial affine registration.
+    for (let iteration = 0; iteration < 3; iteration++) {
+      const predictedPositions = targetXNorm.map(x =>
+        (evaluatePolynomial(candidate!.fit.coefficients, x) - reference.x[0]) / span);
+      const refined = evaluate(matchPeaks(targetPeaks, referencePeaks, targetXNorm, referenceXNorm,
+        targetYNorm, referenceYNorm, parameters.dtwWindow, {predictedPositions, radius}));
+      if (!refined) break;
+      if (strategy === "local" && iteration === 0) candidates.push(refined);
+      if (refined.score <= candidate.score + 1e-6) break;
+      candidates.push(refined);
+      candidate = refined;
+    }
+  }
+  if (!candidates.length) throw new Error(messages.ransacFailed);
+  // Do not replace a working solution for a negligible profile-score change.
+  const best = candidates.reduce((selected, candidate) =>
+    candidate.score > selected.score + 0.005 ? candidate : selected);
+  const { matches: initialMatches, fit: ransac } = best;
 
   onProgress(86, "buildingSpectrum");
   const xOrigin = target.x[0];
@@ -493,11 +517,16 @@ function normalizeIntensity(values: number[]): number[] {
 }
 
 function findPeaks(values: number[], minimumProminence: number): number[] {
+  const differences = values.slice(1).map((value, i) => value - values[i]);
+  const median = (items: number[]) => { const sorted = [...items].sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)] ?? 0; };
+  const centre = median(differences);
+  const noise = 1.4826 * median(differences.map(value => Math.abs(value - centre))) / Math.sqrt(2);
+  const threshold = Math.max(minimumProminence, 4.5 * noise);
   const candidates: Array<{ index: number; prominence: number; height: number }> = [];
   for (let index = 1; index < values.length - 1; index += 1) {
     if (!(values[index] > values[index - 1] && values[index] >= values[index + 1])) continue;
     const prominence = calculateProminence(values, index);
-    if (prominence >= minimumProminence) candidates.push({ index, prominence, height: values[index] });
+    if (prominence >= threshold) candidates.push({ index, prominence, height: values[index] });
   }
 
   if (candidates.length > MAX_PEAKS) {
@@ -520,84 +549,6 @@ function calculateProminence(values: number[], peakIndex: number): number {
     if (values[index] > peakValue) break;
   }
   return peakValue - Math.max(leftMin, rightMin);
-}
-
-interface PeakMatch {
-  targetIndex: number;
-  referenceIndex: number;
-  cost: number;
-}
-
-function matchPeaks(
-  targetPeaks: number[],
-  referencePeaks: number[],
-  targetX: number[],
-  referenceX: number[],
-  targetY: number[],
-  referenceY: number[],
-  windowSize: number,
-): PeakMatch[] {
-  const targetWindows = new Map<number, number[]>();
-  const referenceWindows = new Map<number, number[]>();
-  const getWindow = (cache: Map<number, number[]>, values: number[], index: number) => {
-    if (!cache.has(index)) cache.set(index, normalizeWindow(extractWindow(values, index, windowSize)));
-    return cache.get(index)!;
-  };
-
-  const proposed: PeakMatch[] = [];
-  for (const targetIndex of targetPeaks) {
-    let best: PeakMatch | null = null;
-    for (const referenceIndex of referencePeaks) {
-      if (Math.abs(targetX[targetIndex] - referenceX[referenceIndex]) >= 0.05) continue;
-      const cost = dtwDistance(
-        getWindow(targetWindows, targetY, targetIndex),
-        getWindow(referenceWindows, referenceY, referenceIndex),
-      );
-      const normalizedCost = cost / Math.max(1, windowSize);
-      if (!best || normalizedCost < best.cost) best = { targetIndex, referenceIndex, cost: normalizedCost };
-    }
-    if (best) proposed.push(best);
-  }
-
-  const usedReference = new Set<number>();
-  const unique = proposed
-    .sort((a, b) => a.cost - b.cost)
-    .filter((match) => {
-      if (usedReference.has(match.referenceIndex)) return false;
-      usedReference.add(match.referenceIndex);
-      return true;
-    });
-  return unique.sort((a, b) => a.targetIndex - b.targetIndex);
-}
-
-function extractWindow(values: number[], center: number, windowSize: number): number[] {
-  const half = Math.floor(windowSize / 2);
-  const start = Math.max(0, center - half);
-  const end = Math.min(values.length, center + half + 1);
-  return values.slice(start, end);
-}
-
-function normalizeWindow(values: number[]): number[] {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min;
-  return range === 0 ? values.map(() => 0) : values.map((value) => (value - min) / range);
-}
-
-function dtwDistance(a: number[], b: number[]): number {
-  let previous = new Float64Array(b.length + 1);
-  previous.fill(Number.POSITIVE_INFINITY);
-  previous[0] = 0;
-  for (let i = 1; i <= a.length; i += 1) {
-    const current = new Float64Array(b.length + 1);
-    current.fill(Number.POSITIVE_INFINITY);
-    for (let j = 1; j <= b.length; j += 1) {
-      const cost = Math.abs(a[i - 1] - b[j - 1]);
-      current[j] = cost + Math.min(previous[j], current[j - 1], previous[j - 1]);
-    }
-    previous = current;
-  }
-  return previous[b.length];
 }
 
 function fitRansac(
@@ -673,9 +624,14 @@ function fitRansac(
   }
   if (!isIncreasingPolynomial(coefficients)) throw new Error(messages.nonMonotonic);
 
+  // Recompute labels for the final refit: an earlier membership set can be
+  // stale after coefficients change.
+  const finalIndices = x.map((value, index) => ({index, residual: Math.abs(y[index] - evaluatePolynomial(coefficients, value))}))
+    .filter(item => item.residual <= parameters.ransacTolerance).map(item => item.index);
+  if (finalIndices.length < parameters.polynomialOrder + 1) throw new Error(messages.ransacFailed);
   return {
     coefficients,
-    inlierKeys: new Set(bestIndices.map((index) => matchKey(matches[index]))),
+    inlierKeys: new Set(finalIndices.map((index) => matchKey(matches[index]))),
   };
 }
 

@@ -65,7 +65,7 @@ export function InputSection({
           title={copy.customReferenceTitle}
           description={useInternalReference ? copy.customReferenceOptional : copy.customReferenceDescription}
           file={referenceFile}
-          disabled={isProcessing || useInternalReference}
+          disabled={isProcessing}
           onFile={onReferenceUpload}
           language={language}
         />
@@ -96,7 +96,11 @@ export function InputSection({
         </div>
       )}
 
-      <div className="mt-5 flex justify-end border-t border-slate-200 pt-5">
+      <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p role="status" aria-live="polite" className="min-w-0 break-all text-sm text-slate-700">
+          <span className="font-medium">{language === "ru" ? "Эталон для следующего расчёта" : "Reference for next calibration"}: </span>
+          {useInternalReference ? copy.builtInTitle : referenceFile?.name ?? (language === "ru" ? "Загрузите эталон" : "Upload a reference")}
+        </p>
         <button
           type="button"
           onClick={onRunCalibration}
@@ -161,7 +165,7 @@ function UploadCard({
       {file && (
         <div className="mt-3 flex items-center gap-2 rounded-md bg-slate-100 p-2.5">
           <FileText className="h-4 w-4 shrink-0 text-slate-500" />
-          <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{file.name}</span>
+          <span title={file.name} className="min-w-0 flex-1 truncate text-xs text-slate-700">{file.name}</span>
           <span className="text-xs text-slate-500">{formatBytes(file.size, language)}</span>
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
         </div>

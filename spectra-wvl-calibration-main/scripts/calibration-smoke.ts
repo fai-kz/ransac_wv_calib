@@ -1,3 +1,5 @@
+import "./grating-regression";
+import "./peak-matching-regression";
 import { DEFAULT_PARAMETERS, parseSpectrumFile, parseTextSpectrum, runCalibration } from "../src/lib/calibration";
 import targetText from "../src/data/example_target.txt";
 import referenceText from "../src/data/reference_spectrum.txt";

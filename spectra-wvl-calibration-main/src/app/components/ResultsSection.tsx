@@ -43,6 +43,8 @@ export function ResultsSection({ result, onDownloadJson, onDownloadCsv, language
         </div>
       </div>
 
+      <p className="mt-3 break-all text-xs text-slate-600">{copy.reference}: {result.input.reference.name}</p>
+
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label={copy.dtwMatches} value={String(result.summary.dtwMatches)} />
         <Metric label={copy.ransacInliers} value={`${result.summary.ransacInliers} (${percent(result.summary.ransacInliers, result.summary.dtwMatches)})`} />
@@ -51,13 +53,13 @@ export function ResultsSection({ result, onDownloadJson, onDownloadCsv, language
       </div>
 
       <ChartCard title={copy.spectraTitle} description={copy.spectraDescription}>
-        <ResponsiveContainer width="100%" height={340}>
-          <ComposedChart data={spectrumData} margin={{ top: 12, right: 18, bottom: 42, left: 18 }}>
+        <ResponsiveContainer width="100%" height={380}>
+          <ComposedChart data={spectrumData} margin={{ top: 12, right: 18, bottom: 12, left: 22 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-            <XAxis type="number" dataKey="x" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11 }} label={{ value: copy.wavelengthAxis, position: "insideBottom", offset: -22, fontSize: 12 }} />
-            <YAxis type="number" domain={[0, "auto"]} tick={{ fontSize: 11 }} label={{ value: copy.intensityAxis, angle: -90, position: "insideLeft", offset: -8, fontSize: 12 }} />
+            <XAxis tickFormatter={formatAxisTick} height={56} minTickGap={24} type="number" dataKey="x" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11 }} label={{ value: copy.wavelengthAxis, position: "insideBottom", offset: -8, fontSize: 12 }} />
+            <YAxis tickFormatter={formatAxisTick} width={80} type="number" domain={[0, "auto"]} tick={{ fontSize: 11 }} label={{ value: copy.intensityAxis, angle: -90, position: "insideLeft", offset: -12, fontSize: 12, style: { textAnchor: "middle" } }} />
             <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => format(value)} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
             <Line type="linear" dataKey="target" name={copy.calibratedTarget} stroke="#2B6CB0" dot={false} strokeWidth={1.8} connectNulls />
             <Line type="linear" dataKey="reference" name={copy.reference} stroke="#DD6B20" dot={false} strokeWidth={1.5} connectNulls />
           </ComposedChart>
@@ -67,13 +69,13 @@ export function ResultsSection({ result, onDownloadJson, onDownloadCsv, language
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <ChartCard title={copy.solutionTitle} description={copy.solutionDescription}>
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart margin={{ top: 12, right: 18, bottom: 42, left: 28 }}>
+            <ResponsiveContainer width="100%" height={340}>
+              <ComposedChart margin={{ top: 12, right: 18, bottom: 12, left: 22 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis type="number" dataKey="x" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11 }} label={{ value: copy.inputCoordinate, position: "insideBottom", offset: -22, fontSize: 12 }} />
-                <YAxis type="number" dataKey="y" domain={["auto", "auto"]} tick={{ fontSize: 11 }} label={{ value: copy.wavelengthAxis, angle: -90, position: "insideLeft", offset: -16, fontSize: 12 }} />
+                <XAxis tickFormatter={formatAxisTick} height={56} minTickGap={24} type="number" dataKey="x" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11 }} label={{ value: copy.inputCoordinate, position: "insideBottom", offset: -8, fontSize: 12 }} />
+                <YAxis tickFormatter={formatAxisTick} width={80} type="number" dataKey="y" domain={["auto", "auto"]} tick={{ fontSize: 11 }} label={{ value: copy.wavelengthAxis, angle: -90, position: "insideLeft", offset: -12, fontSize: 12, style: { textAnchor: "middle" } }} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => format(value)} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
                 <Line data={result.plots.solutionCurve} dataKey="y" name={`${copy.polynomial} k=${result.solution.polynomialOrder}`} stroke="#DD6B20" dot={false} strokeWidth={2} />
                 <Scatter data={inliers} name="Inliers" fill="#2B6CB0" />
                 <Scatter data={outliers} name="Outliers" fill="#94A3B8" shape="cross" />
@@ -83,11 +85,11 @@ export function ResultsSection({ result, onDownloadJson, onDownloadCsv, language
         </div>
         <div className="lg:col-span-2">
           <ChartCard title={copy.residualsTitle} description={copy.residualsDescription}>
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart margin={{ top: 12, right: 18, bottom: 42, left: 18 }}>
+            <ResponsiveContainer width="100%" height={340}>
+              <ScatterChart margin={{ top: 12, right: 18, bottom: 12, left: 22 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis type="number" dataKey="x" tick={{ fontSize: 11 }} label={{ value: copy.coordinate, position: "insideBottom", offset: -22, fontSize: 12 }} />
-                <YAxis type="number" dataKey="y" tick={{ fontSize: 11 }} label={{ value: copy.residualAxis, angle: -90, position: "insideLeft", offset: -8, fontSize: 12 }} />
+                <XAxis tickFormatter={formatAxisTick} height={56} minTickGap={24} type="number" dataKey="x" tick={{ fontSize: 11 }} label={{ value: copy.coordinate, position: "insideBottom", offset: -8, fontSize: 12 }} />
+                <YAxis tickFormatter={formatAxisTick} width={80} type="number" dataKey="y" tick={{ fontSize: 11 }} label={{ value: copy.residualAxis, angle: -90, position: "insideLeft", offset: -12, fontSize: 12, style: { textAnchor: "middle" } }} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => format(value)} />
                 <ReferenceLine y={0} stroke="#64748B" strokeDasharray="4 4" />
                 <Scatter data={result.plots.residuals} fill="#2B6CB0" />
@@ -145,6 +147,10 @@ function ExportButton({ icon, label, onClick }: { icon: React.ReactNode; label: 
       {label}
     </button>
   );
+}
+
+function formatAxisTick(value: number) {
+  return Number.isFinite(value) ? value.toFixed(2) : "—";
 }
 
 function format(value: number) {
