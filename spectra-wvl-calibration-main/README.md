@@ -1,6 +1,6 @@
 # Wavelength Calibration Tool
 
-A standalone web application for wavelength calibration of one-dimensional spectra. The algorithm was adapted from `ransac_pf_usage.ipynb` and includes normalization, prominence-based peak detection, ordered peak-sequence matching supported by Dynamic Time Warping of local peak profiles, RANSAC outlier rejection, and a final pixel-to-wavelength polynomial solution.
+A standalone web application for wavelength calibration of one-dimensional spectra. The algorithm was originally adapted from the [historical Python notebook](../python/legacy/ransac_pf_usage.ipynb) and includes normalization, prominence-based peak detection, ordered peak-sequence matching supported by Dynamic Time Warping of local peak profiles, RANSAC outlier rejection, and a final pixel-to-wavelength polynomial solution.
 
 English is the default interface language. Users can switch between English and Russian using the EN/RU control in the header.
 
@@ -71,3 +71,16 @@ Peak prominence uses the larger of the user threshold and 4.5 times a robust noi
 `npm run test:smoke` includes known synthetic wavelengths, changed line brightness and widths, nonlinear dispersion, missing/extra lines, noisy spectra, and the actual February 1800/2400 regressions in `scripts/fixtures/grating-regression.json`. The fixtures contain flux arrays from the HD49340/MRK6 masters dated 2024-02-06, references `lamp1800_rms0103` and `lamp2400_rms0309`, and coefficients from the prior version. They test preservation of the working 1800 mapping and improved 2400 profile alignment, not laboratory accuracy.
 
 On the reported HD49340 2400 example, profile agreement improves from 0.797 to 0.917 and the fitted-pair RMS changes from 1.4868 to 0.9778 Å. MRK6 agreement improves from 0.792 to 0.904, with RMS changing from 1.4973 to 0.8368 Å. A separate batch check of all twenty available master spectra preserved the wavelength coefficients of all ten 1800 masters exactly. No observation FITS files are rewritten by these checks.
+
+## Independent Python implementation
+
+The maintained Python package is in [`../python`](../python/README.md). It ports
+the corrected matching workflow and has no browser dependency. This web app does
+not import or execute Python. Both implementations have independent regression
+tests; `node scripts/check-parity.mjs --python .venv/bin/python` from the repository
+root checks their results against each other on the four real grating fixtures.
+
+Uploading a new target retains and selects the previously uploaded reference in
+the current page session. The active reference appears beside Run calibration
+and its name is included in results and exports. A full reload clears uploaded
+files; upload them again. Selecting the built-in reference is an explicit choice.
